@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SpaceX + Tesla | Whiteboard prompt kit</title>
+  <script>
+    (() => {
+      const param = new URLSearchParams(window.location.search).get("scoutTheme");
+      const theme =
+        param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+  <style>
+    :root {
+      color-scheme: light;
+      --cp-bg: #f7f4ef;
+      --cp-bg-elevated: #fcfbf8;
+      --cp-surface: #ffffff;
+      --cp-surface-soft: #f5f5f5;
+      --cp-border: #dedede;
+      --cp-border-strong: #919191;
+      --cp-text: #242424;
+      --cp-text-muted: #5c5c5c;
+      --cp-text-soft: #6f6f6f;
+      --cp-accent: #b11f4b;
+      --cp-accent-hover: #9a1a41;
+      --cp-accent-soft: rgba(177, 31, 75, 0.08);
+      --cp-accent-fg: #ffffff;
+      --cp-success: #16a34a;
+      --cp-danger: #dc2626;
+      --cp-warning: #f59e0b;
+      --cp-link: #0078d4;
+      --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.12);
+      --cp-overlay: rgba(255, 255, 255, 0.8);
+      --cp-panel: rgba(255, 255, 255, 0.86);
+      --cp-panel-strong: rgba(255, 255, 255, 0.96);
+      --cp-sheen: rgba(255, 255, 255, 0.55);
+      --cp-highlight: rgba(177, 31, 75, 0.12);
+    }
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --cp-bg: #3d3b3a;
+      --cp-bg-elevated: #343231;
+      --cp-surface: #292929;
+      --cp-surface-soft: #2e2e2e;
+      --cp-border: #474747;
+      --cp-border-strong: #5f5f5f;
+      --cp-text: #dedede;
+      --cp-text-muted: #919191;
+      --cp-text-soft: #b0b0b0;
+      --cp-accent: #fd8ea1;
+      --cp-accent-hover: #fb7b91;
+      --cp-accent-soft: rgba(253, 142, 161, 0.14);
+      --cp-accent-fg: #1a1a1a;
+      --cp-success: #4ade80;
+      --cp-danger: #f87171;
+      --cp-warning: #fbbf24;
+      --cp-link: #4da6ff;
+      --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+      --cp-overlay: rgba(41, 41, 41, 0.88);
+      --cp-panel: rgba(41, 41, 41, 0.72);
+      --cp-panel-strong: rgba(41, 41, 41, 0.96);
+      --cp-sheen: rgba(255, 255, 255, 0.04);
+      --cp-highlight: rgba(253, 142, 161, 0.12);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-padding-top: 100px; }
+    body {
+      margin: 0;
+      background: var(--cp-bg);
+      color: var(--cp-text);
+      font: 16px/1.6 "Segoe UI", Aptos, Calibri, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    main { max-width: 1080px; margin: auto; padding: 48px 24px 96px; }
+    h1, h2, h3, p { margin: 0 0 12px; }
+    h1 { font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.15; letter-spacing: -0.035em; }
+    h2 { font-size: 1.5rem; line-height: 1.3; }
+    h3 { font-size: 1rem; }
+    a { color: var(--cp-link); text-underline-offset: 3px; }
+    code, textarea { font-family: Consolas, "Courier New", Courier, monospace; }
+    code { font-size: 0.875rem; overflow-wrap: anywhere; }
+    .eyebrow {
+      color: var(--cp-accent);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+    .muted, .hint { color: var(--cp-text-muted); }
+    .hint { font-size: 0.875rem; }
+    .intro { max-width: 760px; }
+    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+    button, .button-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--cp-border-strong);
+      border-radius: 0.625rem;
+      background: var(--cp-surface);
+      color: var(--cp-text);
+      min-height: 44px;
+      padding: 8px 16px;
+      font: inherit;
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    button:hover, .button-link:hover { background: var(--cp-surface-soft); }
+    button.primary, .button-link.primary {
+      background: var(--cp-accent);
+      color: var(--cp-accent-fg);
+      border-color: var(--cp-accent);
+    }
+    button.primary:hover, .button-link.primary:hover {
+      background: var(--cp-accent-hover);
+      border-color: var(--cp-accent-hover);
+    }
+    button:disabled { cursor: wait; opacity: 0.75; }
+    :focus-visible { outline: 3px solid var(--cp-accent); outline-offset: 4px; }
+    .card {
+      margin-top: 24px;
+      padding: 24px;
+      border: 1px solid var(--cp-border);
+      border-radius: 16px;
+      background: var(--cp-surface);
+      box-shadow: 0 1px 2px var(--cp-border);
+    }
+    .pilot { background: var(--cp-accent-soft); border-color: var(--cp-accent); }
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    .steps p { margin-bottom: 0; font-size: 0.875rem; color: var(--cp-text-muted); }
+    .step-number { color: var(--cp-accent); font-weight: 700; }
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 12px 0;
+      margin-top: 24px;
+      background: var(--cp-bg);
+      border-bottom: 1px solid var(--cp-border);
+    }
+    nav a {
+      flex: 0 0 auto;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      padding: 8px 12px;
+      background: var(--cp-surface);
+      color: var(--cp-text);
+      text-decoration: none;
+      font-size: 0.875rem;
+    }
+    nav a:hover, nav a.pilot-link { border-color: var(--cp-accent); color: var(--cp-accent); }
+    .scene-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+    .scene-heading h2 { margin-top: 4px; }
+    .badge {
+      display: inline-block;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      padding: 4px 8px;
+      color: var(--cp-text-soft);
+      background: var(--cp-surface-soft);
+      font-size: 0.75rem;
+      white-space: nowrap;
+    }
+    .scene-actions { margin: 16px 0 8px; }
+    textarea {
+      display: block;
+      width: 100%;
+      resize: vertical;
+      min-height: 160px;
+      margin-top: 12px;
+      padding: 16px;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-bg-elevated);
+      color: var(--cp-text);
+      font-size: 0.875rem;
+      line-height: 1.6;
+      tab-size: 2;
+    }
+    label { display: block; font-size: 0.875rem; font-weight: 600; }
+    details { margin-top: 20px; border-top: 1px solid var(--cp-border); padding-top: 16px; }
+    details.tools { margin-top: 16px; border: 0; padding-top: 0; }
+    summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+    details .actions { margin-top: 12px; }
+    .cue-list { padding-left: 24px; margin-bottom: 0; }
+    .cue-list li { padding: 4px 0; }
+    .cue-phrase { font-weight: 600; }
+    .note { border-left: 3px solid var(--cp-accent); padding-left: 12px; margin-top: 16px; }
+    #copy-status {
+      position: fixed;
+      z-index: 2;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: max-content;
+      max-width: calc(100% - 32px);
+      padding: 12px 20px;
+      border: 1px solid var(--cp-border-strong);
+      border-radius: 0.625rem;
+      background: var(--cp-surface);
+      color: var(--cp-text);
+      font-size: 0.875rem;
+    }
+    #copy-status:empty { display: none; }
+    footer { margin-top: 32px; color: var(--cp-text-muted); font-size: 0.875rem; }
+    @media (max-width: 640px) {
+      main { padding: 28px 16px 88px; }
+      .card { padding: 20px; }
+      .steps { grid-template-columns: 1fr; gap: 16px; }
+      .scene-heading { flex-direction: column; gap: 0; }
+      .scene-actions button { width: 100%; }
+      textarea { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Whiteboard animation / Prompt kit</p>
+      <h1>SpaceX + Tesla</h1>
+      <p class="intro muted">Six scenes, ready to paste into Gemini. Every scene's copy button includes the shared style instructions, so each prompt works on its own.</p>
+      <div class="actions">
+        <button class="primary" data-copy="full-script" data-copy-label="Full voice-over script">Copy full voice-over script</button>
+        <a class="button-link" href="https://gemini.google.com/app" target="_blank" rel="noopener noreferrer">Open Gemini</a>
+        <a class="button-link" href="https://app.clipchamp.com" target="_blank" rel="noopener noreferrer">Open Clipchamp</a>
+      </div>
+    </header>
+
+    <section class="card pilot" aria-labelledby="pilot-title">
+      <p class="eyebrow">Start small</p>
+      <h2 id="pilot-title">First test: Scene 05</h2>
+      <p>Generate the shareholder-approval image first. Return <code>scene_05.png</code>, your final Clipchamp audio, and its SRT captions. Full-script audio is fine.</p>
+      <a class="button-link primary" href="#scene-05">Jump to Scene 05</a>
+    </section>
+
+    <section class="card steps" aria-label="Production workflow">
+      <div>
+        <h3><span class="step-number">01 /</span> Generate narration</h3>
+        <p>Copy the full script into Clipchamp. Keep one voice and finalize pacing, then export audio and SRT from the same timeline.</p>
+      </div>
+      <div>
+        <h3><span class="step-number">02 /</span> Generate images</h3>
+        <p>Copy one complete scene prompt into Gemini. Download the finished image using the filename on its card.</p>
+      </div>
+      <div>
+        <h3><span class="step-number">03 /</span> Time and render</h3>
+        <p>Map the final image regions to the actual speech timings. Render separate silent MP4s; keep narration separate for mixing.</p>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="source-title">
+      <h2 id="source-title">Source text and shared style</h2>
+      <p class="hint">No timestamps are assigned yet. The generated audio and SRT will determine the reveal windows. This page works offline; it does not generate images or render videos.</p>
+      <details class="tools">
+        <summary>Full voice-over script</summary>
+        <label for="full-script">Original wording, ready for Clipchamp</label>
+        <textarea id="full-script" rows="12" readonly spellcheck="false"></textarea>
+        <div class="actions">
+          <button data-copy="full-script" data-copy-label="Full voice-over script">Copy full script</button>
+        </div>
+      </details>
+      <details class="tools">
+        <summary>Shared Gemini style instructions</summary>
+        <label for="shared-style">Already included in every scene prompt below</label>
+        <textarea id="shared-style" rows="10" readonly spellcheck="false"></textarea>
+        <div class="actions">
+          <button data-copy="shared-style" data-copy-label="Shared style">Copy style only</button>
+        </div>
+      </details>
+    </section>
+
+    <nav id="scene-nav" aria-label="Jump to a scene"></nav>
+    <div id="scenes"></div>
+    <footer>
+      The illustrations describe the supplied interview script, not a confirmed transaction.
+      Keep the original narration and SRT together. If audio timing changes, update the scene timeline before rendering.
+    </footer>
+    <noscript><p>This page needs JavaScript to display the prompts and enable copy buttons. Open it in a browser with JavaScript enabled.</p></noscript>
+  </main>
+  <div id="copy-status" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <template id="scene-template">
+    <section class="card scene">
+      <div class="scene-heading">
+        <div>
+          <p class="eyebrow scene-number"></p>
+          <h2 class="scene-title"></h2>
+        </div>
+        <code class="badge scene-filename"></code>
+      </div>
+      <p class="hint scene-description"></p>
+      <div class="actions scene-actions">
+        <button class="primary copy-prompt">Copy Gemini prompt</button>
+      </div>
+      <p class="hint">Copies shared style + this scene. Paste directly into Gemini; no assembly needed.</p>
+      <label class="prompt-label">Complete Gemini prompt</label>
+      <textarea class="prompt-text" rows="14" readonly spellcheck="false"></textarea>
+      <details class="script-details">
+        <summary>Scene narration and drawing cues</summary>
+        <label class="script-label">Exact script segment</label>
+        <textarea class="script-text" rows="5" readonly spellcheck="false"></textarea>
+        <div class="actions">
+          <button class="copy-script">Copy scene script</button>
+        </div>
+        <h3 style="margin-top: 20px">Reveal when these phrases are spoken</h3>
+        <ol class="cue-list"></ol>
+      </details>
+      <p class="hint note scene-note" hidden></p>
+    </section>
+  </template>
+
+  <script>
+    "use strict";
+
+    const sharedStyle = `Create finished illustrations for a whiteboard-animation renderer, not videos or storyboards.
+
+Use a horizontal 16:9 canvas with a pure white background. Use clean, medium-thickness black marker outlines, flat blue and orange accents, and large readable printed lettering. Keep the same style across all images.
+
+Leave generous white space between visual groups. Objects, labels, and connectors that belong to different groups must not touch. Avoid shadows, gradients, textures, decorative backgrounds, outer frames, and tiny details. Do not include a drawing hand or pen.
+
+Include only the visible text specified in the scene description. Return one finished image, not several panels or variations. Do not print these instructions or scene numbers in the image.`;
+
+    const scenes = [
+      {
+        id: "01",
+        title: "The merger question",
+        shortTitle: "The question",
+        description: "Companies, a possible combination, pros and cons, and roadblocks.",
+        script: `So, there's been a lot of reporting, a lot of anticipation of a merger with Tesla. I realize you may be limited on what you can say, but if we take a step back, how do you think about the pros and cons of a potential combination? And as part of that framework, are there any roadblocks that you need to address before embarking on it?`,
+        cues: [
+          ["a lot of reporting", "Introduce the SpaceX and Tesla groups."],
+          ["anticipation of a merger", "Reveal the possible-merger question mark."],
+          ["the pros and cons", "Reveal the plus/minus group and its label."],
+          ["any roadblocks", "Reveal the road barrier and its label."]
+        ],
+        prompt: `Create an illustration about a question concerning a possible SpaceX-Tesla merger, not an announced or completed merger.
+
+Arrange five clearly separated visual groups:
+1. Upper left: a simple rocket icon with the label "SpaceX".
+2. Upper right: a simple electric car icon with the label "Tesla".
+3. Center: a large question mark with the label "Possible merger?".
+4. Lower left: two small, separate symbols, a plus and a minus, with the label "Pros and cons".
+5. Lower right: a simple road barrier with the label "Roadblocks?".
+
+Keep all groups on one open white canvas. Do not connect the companies with a solid merger arrow. Do not invent specific benefits, risks, or financial figures.`
+      },
+      {
+        id: "02",
+        title: "Committees and independent directors",
+        shortTitle: "Committees",
+        description: "Two separate committees, requested by shareholders and composed of independent directors.",
+        script: `Both SpaceX and Tesla have formed special committees to discuss this idea, at the request of shareholders. These special committees consist of independent directors.`,
+        cues: [
+          ["Both SpaceX and Tesla have formed special committees", "Reveal both committee groups."],
+          ["at the request of shareholders", "Reveal the shareholder-request group."],
+          ["independent directors", "Reveal the independent-director captions."]
+        ],
+        prompt: `Illustrate two separate special committees considering a proposal.
+
+Upper left: three simple generic people around a small table, labeled "SpaceX committee".
+Upper right: a separate matching group around another table, labeled "Tesla committee".
+
+Below each committee, leave a generous white gap and place the separate caption "Independent directors". Do not attach these captions to the figures or table outlines.
+
+Bottom center: a separate small group of shareholder icons with the label "Shareholder request".
+
+Make each committee, its caption, and the shareholder group visually distinct. Do not draw connecting arrows, a shared enclosure, handshakes, signatures, or approval marks. The two committees are separate groups, not a combined company.`
+      },
+      {
+        id: "03",
+        title: "Outside the discussions",
+        shortTitle: "Exclusion",
+        description: "A conflict of interest keeps the speaker outside the committee discussions.",
+        script: `And because I'm a conflicted party, I can't actually be in the discussions of the special committees. So, it's sort of an odd kabuki dance, where two groups of people are talking, and I can't be in the conversation.`,
+        cues: [
+          ["I'm a conflicted party", "Reveal the person and conflict-of-interest caption."],
+          ["discussions of the special committees", "Reveal the separate committee groups."],
+          ["two groups of people are talking", "Reveal their detached speech bubbles."],
+          ["I can't be in the conversation", "Reveal the exclusion caption."]
+        ],
+        prompt: `Illustrate a person excluded from committee discussions because of a conflict of interest.
+
+Left third: a simple generic person icon, not a portrait, labeled "Elon Musk". Underneath, separated by white space, place the caption "Conflict of interest".
+
+Upper right: a small group of generic people labeled "SpaceX committee".
+Lower right: another separate group labeled "Tesla committee".
+
+Place small empty speech bubbles near the committee groups to suggest discussion. Keep each bubble detached from other groups.
+
+Bottom left: a clearly separated caption, "Not in discussions".
+
+Leave a wide blank vertical gutter between the person and the committees. Do not use connecting lines, overlapping figures, a large shared frame, or a caricature.`
+      },
+      {
+        id: "04",
+        title: "Favorable does not mean certain",
+        shortTitle: "Uncertainty",
+        description: "Distinguish the speaker's favorable opinion from a confirmed outcome.",
+        script: `I think some people out there assume that a SpaceX and Tesla merger is a certainty, and I think that would be overstating it. Do I think it would be a good idea? Yes.`,
+        cues: [
+          ["a SpaceX and Tesla merger", "Reveal the proposed-merger group."],
+          ["that would be overstating it", "Reveal the uncertainty group."],
+          ["a good idea? Yes.", "Reveal the favorable personal-opinion group."]
+        ],
+        prompt: `Create a whiteboard illustration distinguishing an uncertain outcome from a favorable personal opinion.
+
+Upper center: a small rocket and electric car, separated by white space, with the caption "Proposed merger".
+
+Lower left: a large question mark above the words "Not certain".
+
+Lower right: a simple thumbs-up icon above two lines of text: "Musk's view" and "Good idea".
+
+Keep the uncertainty group and the personal-opinion group widely separated. Give them similar visual weight so that the positive opinion does not look like confirmation of a deal.
+
+Do not include a completed merger, signed agreement, approval stamp, or a connecting arrow between the lower groups.`
+      },
+      {
+        id: "05",
+        title: "Shareholder approval",
+        shortTitle: "First test",
+        description: "Recommended pilot: five distinct speech cues and clearly separated visual groups.",
+        script: `But at the end of the day, the shareholders have to be supportive of this. And particularly on the Tesla side, we will need a 50% vote of all shares, not just those who vote, but of all shareholders. And that's quite a high hurdle to try to achieve.`,
+        cues: [
+          ["the shareholders have to be supportive", "Reveal the shareholder group and support label."],
+          ["particularly on the Tesla side", "Reveal the Tesla heading."],
+          ["a 50% vote of all shares", "Reveal the share grid and 50% statement."],
+          ["not just those who vote", "Reveal the clarifying caption."],
+          ["quite a high hurdle", "Reveal the hurdle symbol and label."]
+        ],
+        note: "Before returning this image, check that it has exactly ten squares, five orange, and the correct labels. The grid represents shares, not ten individual shareholders.",
+        prompt: `Create a whiteboard illustration explaining the shareholder-vote requirement as described in an interview.
+
+Arrange five separate groups with wide white gaps:
+
+Upper left: three generic shareholder icons above the label "Shareholder support".
+
+Upper right: the standalone heading "Tesla".
+
+Center: exactly ten separate, equally sized squares arranged in two rows of five. Every square has a black outline. Fill exactly five squares orange; leave the other five white. Keep visible white gaps between all squares. Beneath the grid, write "50% of all shares" in large, readable lettering.
+
+Lower left: the standalone caption "Not just votes cast".
+
+Lower right: a simple athletics hurdle icon labeled "High hurdle".
+
+The grid is a conceptual share-count illustration, not ten individual shareholders. Do not add people inside the squares, extra percentages, arrows, decorative borders, or other text. Keep every group spatially separate so it can be revealed independently.`
+      },
+      {
+        id: "06",
+        title: "No agreement yet",
+        shortTitle: "No agreement",
+        description: "Unresolved terms and no guaranteed outcome, rather than a completed or rejected deal.",
+        script: `So, I can just say that at this point, the special committees have not reached agreement on the terms of any transaction, and obviously, there's no guarantee that they will.`,
+        cues: [
+          ["the special committees", "Reveal both committee groups."],
+          ["have not reached agreement", "Reveal the no-agreement caption."],
+          ["the terms of any transaction", "Reveal the unsigned terms document."],
+          ["there's no guarantee", "Reveal the final question mark and caption."]
+        ],
+        prompt: `Illustrate an unresolved discussion about a potential transaction.
+
+Upper left: a small generic meeting group labeled "SpaceX committee".
+Upper right: a separate matching meeting group labeled "Tesla committee".
+
+Center: a simple unsigned document labeled "Transaction terms". Use only a few short black lines to suggest document content. Do not add a signature, seal, check mark, or extra readable text.
+
+Below the document, separated by white space: the caption "No agreement yet".
+
+At the bottom right, in its own separate group: a question mark with the caption "No guarantee".
+
+Keep the composition neutral and unresolved. Do not depict either a completed deal or a definitively rejected deal. Do not draw lines connecting the groups.`
+      }
+    ];
+
+    document.getElementById("shared-style").value = sharedStyle;
+    document.getElementById("full-script").value = [
+      scenes[0].script,
+      `${scenes[1].script} ${scenes[2].script}`,
+      `${scenes[3].script} ${scenes[4].script}`,
+      scenes[5].script
+    ].join("\n\n");
+
+    const template = document.getElementById("scene-template");
+    const container = document.getElementById("scenes");
+    const nav = document.getElementById("scene-nav");
+
+    for (const scene of scenes) {
+      const card = template.content.firstElementChild.cloneNode(true);
+      const promptId = `prompt-${scene.id}`;
+      const scriptId = `script-${scene.id}`;
+      card.id = `scene-${scene.id}`;
+      card.setAttribute("aria-labelledby", `title-${scene.id}`);
+      card.querySelector(".scene-number").textContent =
+        `Scene ${scene.id}${scene.id === "05" ? " / Recommended first test" : ""}`;
+      const title = card.querySelector(".scene-title");
+      title.id = `title-${scene.id}`;
+      title.textContent = scene.title;
+      card.querySelector(".scene-filename").textContent = `scene_${scene.id}.png`;
+      card.querySelector(".scene-description").textContent = scene.description;
+      const prompt = card.querySelector(".prompt-text");
+      prompt.id = promptId;
+      prompt.value = `${sharedStyle}\n\nSCENE DESCRIPTION\n\n${scene.prompt}`;
+      card.querySelector(".prompt-label").htmlFor = promptId;
+      const promptButton = card.querySelector(".copy-prompt");
+      promptButton.dataset.copy = promptId;
+      promptButton.dataset.copyLabel = `Scene ${scene.id} Gemini prompt`;
+      const script = card.querySelector(".script-text");
+      script.id = scriptId;
+      script.value = scene.script;
+      card.querySelector(".script-label").htmlFor = scriptId;
+      const scriptButton = card.querySelector(".copy-script");
+      scriptButton.dataset.copy = scriptId;
+      scriptButton.dataset.copyLabel = `Scene ${scene.id} script`;
+      for (const [phrase, action] of scene.cues) {
+        const item = document.createElement("li");
+        const cue = document.createElement("span");
+        cue.className = "cue-phrase";
+        cue.textContent = `"${phrase}"`;
+        item.append(cue, document.createTextNode(` - ${action}`));
+        card.querySelector(".cue-list").append(item);
+      }
+      if (scene.note) {
+        const note = card.querySelector(".scene-note");
+        note.textContent = scene.note;
+        note.hidden = false;
+      }
+      container.append(card);
+      const link = document.createElement("a");
+      link.href = `#${card.id}`;
+      link.textContent = `${scene.id} ${scene.shortTitle}`;
+      if (scene.id === "05") link.className = "pilot-link";
+      nav.append(link);
+    }
+
+    let statusTimer;
+
+    async function copyField(button) {
+      const field = document.getElementById(button.dataset.copy);
+      const status = document.getElementById("copy-status");
+      const originalLabel = button.dataset.defaultLabel || button.textContent;
+      button.dataset.defaultLabel = originalLabel;
+      button.disabled = true;
+      let copied = false;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(field.value);
+          copied = true;
+        }
+      } catch {
+        copied = false;
+      }
+      if (!copied) {
+        // Local-file clipboard permissions vary; leave a selectable fallback.
+        for (let parent = field.parentElement; parent; parent = parent.parentElement) {
+          if (parent.tagName === "DETAILS") parent.open = true;
+        }
+        field.focus();
+        field.select();
+        field.setSelectionRange(0, field.value.length);
+        try {
+          copied = document.execCommand("copy");
+        } catch {
+          copied = false;
+        }
+      }
+      clearTimeout(statusTimer);
+      status.textContent = copied
+        ? `${button.dataset.copyLabel} copied.`
+        : "Automatic copy is unavailable. The text is selected: press Ctrl+C (Cmd+C on Mac).";
+      button.disabled = false;
+      if (copied) {
+        button.textContent = "Copied!";
+        button.focus({ preventScroll: true });
+        setTimeout(() => { button.textContent = originalLabel; }, 1600);
+        statusTimer = setTimeout(() => { status.textContent = ""; }, 4500);
+      }
+    }
+
+    document.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-copy]");
+      if (button && !button.disabled) copyField(button);
+    });
+  </script>
+</body>
+</html>
