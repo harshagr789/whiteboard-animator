@@ -44,6 +44,45 @@ def make_animator() -> WhiteboardAnimator:
     return WhiteboardAnimator()
 
 
+def test_canvas_fit_letterboxes_and_remaps_cues_without_mutating_them():
+    image = np.full((100, 200, 3), 255, dtype=np.uint8)
+    image[:, :100] = 0
+    plan = [{"start": 1, "end": 2, "boxes": [
+        {"xmin": 0, "ymin": 0, "xmax": 500, "ymax": 1000},
+    ]}]
+    canvas, fitted_plan = WhiteboardAnimator._fit_canvas(image, (100, 300), plan)
+    assert canvas.shape == (300, 100, 3)
+    assert np.all(canvas[:125] == 255) and np.all(canvas[175:] == 255)
+    assert np.all(canvas[125:175, :50] == 0)
+    assert np.all(canvas[125:175, 51:] == 255)
+    box = fitted_plan[0]["boxes"][0]
+    assert box["xmin"] == 0 and box["xmax"] == 500
+    assert box["ymin"] == pytest.approx(125 / 300 * 1000)
+    assert box["ymax"] == pytest.approx(175 / 300 * 1000)
+    assert plan[0]["boxes"][0]["ymin"] == 0
+
+
+@pytest.mark.parametrize("size", [(0, 200), (101, 200), (100, -2), (100.0, 200)])
+def test_invalid_canvas_size_is_rejected(size):
+    with pytest.raises(ValueError, match="positive even integers"):
+        WhiteboardAnimator._fit_canvas(np.zeros((10, 10, 3), dtype=np.uint8), size, None)
+
+
+def test_stroke_and_fill_classification_remains_sensible_at_portrait_scales():
+    import cv2
+
+    classifications = []
+    for scale in (1, 1.5):
+        image = np.full((round(400 * scale), round(240 * scale), 3), 255, dtype=np.uint8)
+        cv2.line(image, (round(30 * scale), round(70 * scale)),
+                 (round(210 * scale), round(70 * scale)), (20, 20, 20), round(4 * scale))
+        cv2.circle(image, (round(120 * scale), round(240 * scale)),
+                   round(40 * scale), (40, 100, 160), -1)
+        components = make_animator()._find_components(image)
+        classifications.append(sorted(component["is_fill"] for component in components))
+    assert classifications == [[False, True], [False, True]]
+
+
 # ── assign_components_to_boxes ──────────────────────────────────────────
 
 
@@ -309,6 +348,18 @@ def test_many_children_cannot_overflow_semantic_parent_window():
 
     assert len(schedule) == len(children)
     assert abs(max(start + duration for _comp, start, duration in schedule) - 4.4) < 1e-6
+
+
+def test_short_cue_is_not_stretched_past_its_end():
+    animator = make_animator()
+    components = [make_component(10, 10, 20, 20), make_component(50, 50, 60, 60)]
+    plan = [element_entry([
+        norm_box(0, 0, 30, 30), norm_box(40, 40, 70, 70),
+    ], 1.0, 1.02)]
+    schedule = animator._schedule_elements(components, plan, (1000, 1000))
+    assert len(schedule) == 2
+    assert all(1 <= start < start + duration <= 1.020001
+               for _, start, duration in schedule)
 
 
 def test_semantic_parent_mask_is_exact_union_of_disconnected_children():

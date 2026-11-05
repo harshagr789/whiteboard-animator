@@ -1,8 +1,8 @@
 """Region plans: how one image is decomposed into ordered drawing acts.
 
 A plan lists regions (bounding box, reveal order, associated narration text).
-The animator estimates time windows from text length and box area; these are
-not timestamps aligned to the audio.
+Optional start/end times give exact drawing cues; otherwise windows are
+estimated from text length and box area, not aligned to the audio.
 
 The planner uses Google's object-detection convention:
 `box_2d` is [ymin, xmin, ymax, xmax] normalized to 0-1000, relative to the
@@ -85,9 +85,15 @@ class Region(BaseModel):
             "'fill' for solid filled shapes, 'fade' for backgrounds/decoration."
         ),
     )
+    start: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
+    end: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
 
     @model_validator(mode="after")
     def _ensure_box_source(self):
+        if (self.start is None) != (self.end is None):
+            raise ValueError("Region timing requires both start and end")
+        if self.start is not None and self.end <= self.start:
+            raise ValueError("Region end must be greater than start")
         if self.box is None and not self.box_2d and self.bbox is None:
             raise ValueError("Region requires box, box_2d, or legacy bbox")
         # If only the list form was supplied, hydrate `box` for downstream use.
@@ -157,6 +163,24 @@ class SnippetRegionPlan(BaseModel):
         min_length=2, max_length=2,
     )
 
+    @model_validator(mode="after")
+    def _validate_timing(self):
+        timed = [region for region in self.regions if region.start is not None]
+        if not timed:
+            return self
+        if len(timed) != len(self.regions):
+            raise ValueError("Use explicit timing for every region or for none")
+        if len({region.reveal_order for region in timed}) != len(timed):
+            raise ValueError("Timed regions must have unique reveal_order values")
+        previous_end = 0.0
+        for region in sorted(timed, key=lambda item: item.reveal_order):
+            if region.box is None:
+                raise ValueError("Timed regions require a normalized box or box_2d")
+            if region.start < previous_end:
+                raise ValueError("Timed regions must not overlap and must follow reveal_order")
+            previous_end = region.end
+        return self
+
     @property
     def transcript_text(self) -> str:
         return " ".join(
@@ -180,7 +204,8 @@ def build_narration_weighted_plan(
 ) -> list[dict] | None:
     """Turn a region plan into animator windows paced by narration.
 
-    The total drawing spans DRAW_BUDGET of the audio. Within that budget each
+    Explicit region timestamps take precedence. Otherwise drawing spans
+    DRAW_BUDGET of the audio. Within that budget each
     region's slot is proportional to a blend of its annotation's character
     share and its box-area share. This does not analyze or align speech.
     """
@@ -188,6 +213,18 @@ def build_narration_weighted_plan(
     regions = [r for r in regions if r.box is not None]
     if not regions or audio_duration <= 0:
         return None
+
+    if regions[0].start is not None:
+        for region in regions:
+            if region.end > audio_duration:
+                raise ValueError(
+                    f"region '{region.label}' ends at {region.end:g}s, "
+                    f"beyond scene duration {audio_duration:g}s"
+                )
+        return [
+            {"boxes": [region.box.model_dump()], "start": region.start, "end": region.end}
+            for region in regions
+        ]
 
     char_counts = [len((r.annotation or "").strip()) for r in regions]
     total_chars = sum(char_counts)

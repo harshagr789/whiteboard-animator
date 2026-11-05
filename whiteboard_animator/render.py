@@ -52,6 +52,8 @@ def render_scene(
     *,
     quality: str = "medium",
     animator: WhiteboardAnimator | None = None,
+    output_size: tuple[int, int] | None = None,
+    fps: int | None = None,
 ) -> float:
     """Render one scene to an MP4. Returns the scene duration in seconds.
 
@@ -76,7 +78,11 @@ def render_scene(
         rgba = image.convert("RGBA")
         background = Image.new("RGBA", image.size, "white")
         img_array = np.array(Image.alpha_composite(background, rgba).convert("RGB"))
-    settings = QUALITY.get(quality, QUALITY["medium"])
+    settings = dict(QUALITY.get(quality, QUALITY["medium"]))
+    if fps is not None:
+        settings["fps"] = fps
+    if output_size is not None:
+        settings["output_size"] = output_size
     output_path = str(output_path)
 
     if scene.audio is None:
@@ -129,6 +135,8 @@ def render_video(
     output_path: str | Path,
     *,
     quality: str = "medium",
+    output_size: tuple[int, int] | None = None,
+    fps: int | None = None,
 ) -> list[float]:
     """Render every scene and concatenate them. Returns per-scene durations.
 
@@ -141,18 +149,22 @@ def render_video(
     if len(with_audio) > 1:
         raise ValueError("either every scene has audio or none does")
     if len(scenes) == 1:
-        return [render_scene(scenes[0], output_path, quality=quality)]
+        return [render_scene(
+            scenes[0], output_path, quality=quality, output_size=output_size, fps=fps,
+        )]
 
     animator = None
     durations = []
     with tempfile.TemporaryDirectory() as temp_dir:
         segments = []
         for index, scene in enumerate(scenes):
-            plan = build_narration_weighted_plan(scene.region_plan, 1.0) if scene.region_plan else None
-            if animator is None or (animator.fade_duration == 0.12) == bool(plan):
-                animator = WhiteboardAnimator(fade_duration=0.06 if plan else 0.12)
+            has_plan = bool(scene.region_plan and any(r.box is not None for r in scene.region_plan.regions))
+            if animator is None or (animator.fade_duration == 0.12) == has_plan:
+                animator = WhiteboardAnimator(fade_duration=0.06 if has_plan else 0.12)
             segment = os.path.join(temp_dir, f"segment_{index:03d}.mp4")
-            durations.append(render_scene(scene, segment, quality=quality, animator=animator))
+            durations.append(render_scene(
+                scene, segment, quality=quality, animator=animator, output_size=output_size, fps=fps,
+            ))
             segments.append(segment)
         concatenate(segments, output_path)
     return durations

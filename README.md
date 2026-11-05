@@ -143,7 +143,20 @@ Several scenes, concatenated in order:
 whiteboard-animate a.png b.png c.png --audio a.wav b.wav c.wav -o lecture.mp4
 ```
 
-Quality presets: `low` (20 fps, 500k), `medium` (24 fps, 1500k, default), `high` (24 fps, 3000k). Images whose longest side exceeds 1280px are downscaled.
+Quality presets: `low` (20 fps, 500k), `medium` (24 fps, 1500k, default), `high` (24 fps, 3000k). By default, images whose longest side exceeds 1280px are downscaled.
+
+For native portrait output, provide portrait artwork and set an explicit canvas:
+
+```bash
+whiteboard-animate scene.png --duration 8 --size 1080x1920 --fps 30 --quality high -o reel.mp4
+```
+
+`--size WIDTHxHEIGHT` bypasses the default 1280px cap. It fits the image onto a
+white canvas without stretching or cropping, and transforms region boxes to
+match. It does not redesign landscape artwork for portrait or restore detail
+missing from a small source image. Both dimensions must be positive even
+integers. `--fps` overrides the preset's frame rate and must be a positive
+integer. The same settings apply to every scene in a multi-scene video.
 
 ### Pace the drawing using narration text
 
@@ -151,7 +164,22 @@ By default the whole image draws over the first 70% of the scene in a heuristic 
 
 With a region plan, the engine allocates the first 75% of the audio to drawing windows. Each region's share blends its fraction of annotation characters (70% weight) and bounding-box area (30% weight). If all annotations are empty, it uses box area alone. A region can finish early and hold until the next window.
 
-This estimates pacing from text; it does not analyze speech or align to spoken-word timestamps. Pauses, changes in speaking rate, and uneven phrase lengths can cause the drawing to lead or lag the voice. `--detect-regions` proposes regions and their order, but does not add audio alignment. For exact cue times, pass explicit `start` and `end` times in an `element_plan` to the lower-level `WhiteboardAnimator.render_to_file` API.
+This estimates pacing from text; it does not analyze speech or align to spoken-word timestamps. Pauses, changes in speaking rate, and uneven phrase lengths can cause the drawing to lead or lag the voice. `--detect-regions` proposes regions and their order, but does not add audio alignment.
+
+For exact cues, add `start` and `end` in seconds to **every** region in the
+JSON plan. Explicit cues replace estimated timing, can include pauses between
+regions, and work with audio or `--duration`. Both values must be finite and
+nonnegative, `end` must exceed `start`, and cues must not overlap or extend
+beyond the scene. Their order must agree with unique `reveal_order` values.
+Timed regions require normalized `box` or `box_2d` coordinates. An object can
+finish early within its cue; allow a short hold after the last cue for the
+reveal fade to complete. Without timestamps, existing estimated pacing is
+unchanged.
+
+Keep cue boxes tight around separate drawing acts. A connected component that
+spans multiple regions is treated as shared structure and can draw with the
+earliest region. Separate touching artwork or adjust the boxes when a later
+object appears too early.
 
 ```bash
 whiteboard-animate scene.png --audio scene.wav --regions scene.regions.json -o scene.mp4
@@ -177,6 +205,29 @@ A plan is JSON. Boxes are normalized 0 to 1000 with the origin at the top left:
 }
 ```
 
+For example, adding `"start": 1.2, "end": 3.5` to the sun region above starts
+drawing it at 1.2 seconds rather than estimating a window from its annotation.
+These are supplied cues, not automatic speech alignment.
+
+### Rebuild the portrait transcript example
+
+`examples\transcript_reel.py` creates original marker-style artwork, timed region
+JSON, phone-sized captions, and a native 1080x1920, 30 fps video for the opening
+SpaceX/Tesla example used during development. Supply narration for that same
+30-second excerpt; the script uses the first 27 seconds and holds the finished
+board for the last three seconds rather than ending on an incomplete sentence.
+No API or speech-generation package is required.
+
+```powershell
+python examples\transcript_reel.py --audio narration.wav --output reel.mp4 --work-dir tmp\reel
+```
+
+Add `--comparison-audio other-narration.wav` to export the same visuals with a
+second voice. Artwork, cue plans, captions, and a render-time/memory report stay
+in the work directory. The script prefers installed Windows marker fonts and
+falls back to DejaVu Sans. Audio levels are normalized during export. This is a
+specific reproducible example, not a general transcript-to-video generator.
+
 With the `gemini` extra and `GOOGLE_API_KEY` set, the plan can be detected from the image and the narration text:
 
 ```bash
@@ -200,7 +251,20 @@ render_video(
 )
 ```
 
-Lower level, `WhiteboardAnimator.render_to_file(img_array, draw_duration, total_duration, output_path, fps=24, bitrate="1500k", element_plan=None)` takes an RGB numpy array and writes a silent MP4. The constructor exposes every tuning knob: fade length, fill detection thresholds, brush angle and width, the S-curve that decides when a fill uses brush strokes instead of a sweep, and the line-art decomposition thresholds.
+Both `render_video` and `render_scene` accept `output_size=(1080, 1920)` and
+`fps=30`. For example:
+
+```python
+render_video(
+    [Scene("portrait.png", duration=8, region_plan=plan)],
+    "reel.mp4",
+    quality="high",
+    output_size=(1080, 1920),
+    fps=30,
+)
+```
+
+Lower level, `WhiteboardAnimator.render_to_file(img_array, draw_duration, total_duration, output_path, fps=24, bitrate="1500k", element_plan=None, output_size=None)` takes an RGB numpy array and writes a silent MP4. The constructor exposes every tuning knob: fade length, fill detection thresholds, brush angle and width, the S-curve that decides when a fill uses brush strokes instead of a sweep, and the line-art decomposition thresholds. Pixel-based brush and fill settings may need tuning for unusually large or small artwork.
 
 ## What makes a good input
 

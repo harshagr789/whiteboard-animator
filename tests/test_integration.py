@@ -152,3 +152,72 @@ def test_encoder_failure_includes_ffmpeg_diagnostic(tmp_path):
         encode_blank_video(64, 64, 2, str(tmp_path / "missing" / "out.mp4"), 20, "500k", "veryfast")
     assert "No such file or directory" in str(error.value)
     assert "libx264" in str(error.value)
+
+
+def decoded_frame(path, seconds):
+    cap = cv2.VideoCapture(str(path))
+    try:
+        cap.set(cv2.CAP_PROP_POS_MSEC, seconds * 1000)
+        ok, bgr = cap.read()
+        assert ok, f"could not decode frame at {seconds}s"
+        return cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+    finally:
+        cap.release()
+
+
+def write_timed_plan(path, regions):
+    path.write_text(json.dumps({
+        "idea": "timed reveal",
+        "regions": [
+            {"label": f"r{i}", "role": "main_concept", "reveal_order": i,
+             "expected_visual": "drawing", "box": box, "start": start, "end": end}
+            for i, (box, start, end) in enumerate(regions, 1)
+        ],
+    }))
+
+
+def test_cli_native_portrait_with_delayed_cue(tmp_path):
+    source = np.full((1920, 1080, 3), 255, dtype=np.uint8)
+    cv2.putText(source, "SUN", (320, 600), cv2.FONT_HERSHEY_SIMPLEX, 4, (20, 20, 20), 8)
+    cv2.circle(source, (540, 1000), 120, (230, 150, 20), -1)
+    image = tmp_path / "portrait.png"
+    Image.fromarray(source).save(image)
+    plan = tmp_path / "timed.json"
+    write_timed_plan(plan, [
+        ({"ymin": 0, "xmin": 0, "ymax": 1000, "xmax": 1000}, 0.5, 1.6),
+    ])
+    output = tmp_path / "native.mp4"
+    run_cli(image, "--regions", plan, "--duration", "2", "--quality", "high",
+            "--size", "1080x1920", "--fps", "30", "-o", output)
+    metadata = probe(output)
+    stream = next(s for s in metadata["streams"] if s["codec_type"] == "video")
+    assert (stream["width"], stream["height"]) == (1080, 1920)
+    assert stream["avg_frame_rate"] == "30/1"
+    assert abs(float(metadata["format"]["duration"]) - 2) <= 1 / 30
+    assert decoded_frame(output, 0.4).mean() > 254
+    final = decoded_frame(output, 1.9)
+    ink = np.any(source < 200, axis=2)
+    assert np.abs(final.astype(float) - source.astype(float))[ink].mean() < 15
+
+
+def test_cli_letterboxes_timed_regions_across_multiple_scenes(scene, tmp_path):
+    image, _ = scene
+    plan = tmp_path / "timed.json"
+    write_timed_plan(plan, [
+        ({"ymin": 0, "xmin": 0, "ymax": 350, "xmax": 1000}, 0.2, 0.8),
+        ({"ymin": 350, "xmin": 0, "ymax": 1000, "xmax": 1000}, 1.1, 1.7),
+    ])
+    output = tmp_path / "fitted.mp4"
+    run_cli(image, image, "--regions", plan, plan, "--duration", "2",
+            "--size", "360x640", "--fps", "30", "-o", output)
+    metadata = probe(output)
+    stream = next(s for s in metadata["streams"] if s["codec_type"] == "video")
+    assert (stream["width"], stream["height"]) == (360, 640)
+    assert stream["avg_frame_rate"] == "30/1"
+    assert abs(float(metadata["format"]["duration"]) - 4) <= 0.1
+    middle = decoded_frame(output, 0.95)
+    assert middle[:230].mean() > 254 and middle[410:].mean() > 254
+    assert np.any(middle[250:290] < 200, axis=2).sum() > 100
+    assert middle[320:390].mean() > 254
+    assert decoded_frame(output, 2.1).mean() > 254
+    assert np.any(decoded_frame(output, 3.9)[320:390] < 200, axis=2).sum() > 100

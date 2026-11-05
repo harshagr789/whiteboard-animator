@@ -1,3 +1,6 @@
+import pytest
+from pydantic import ValidationError
+
 from whiteboard_animator.regions import (
     DRAW_BUDGET,
     Box,
@@ -68,3 +71,43 @@ def test_narration_weighted_plan_without_annotations_uses_area():
 def test_narration_weighted_plan_empty_regions_returns_none():
     plan = SnippetRegionPlan(idea="idea", regions=[])
     assert build_narration_weighted_plan(plan, 10.0) is None
+
+
+def timed_region(order, start, end):
+    data = make_region(order, Box(ymin=0, xmin=0, ymax=500, xmax=500), "").model_dump()
+    return Region.model_validate({**data, "start": start, "end": end})
+
+
+def test_explicit_cues_preserve_gaps_and_ignore_draw_budget():
+    plan = SnippetRegionPlan(idea="timed", regions=[
+        timed_region(2, 4, 5), timed_region(1, 1, 2),
+    ])
+    entries = build_narration_weighted_plan(plan, 6)
+    assert [(entry["start"], entry["end"]) for entry in entries] == [(1, 2), (4, 5)]
+
+
+@pytest.mark.parametrize("start,end", [
+    (None, 2), (1, None), (-1, 2), (2, 1), (2, 2),
+    (float("nan"), 2), (1, float("inf")),
+])
+def test_invalid_region_timing_is_rejected(start, end):
+    with pytest.raises(ValidationError):
+        timed_region(1, start, end)
+
+
+def test_mixed_timed_and_untimed_regions_are_rejected():
+    untimed = make_region(2, Box(ymin=500, xmin=0, ymax=1000, xmax=1000), "")
+    with pytest.raises(ValidationError, match="every region"):
+        SnippetRegionPlan(idea="mixed", regions=[timed_region(1, 0, 1), untimed])
+
+
+@pytest.mark.parametrize("second", [(2, 0.5, 2), (2, 0, 0.5), (1, 2, 3)])
+def test_overlapping_out_of_order_or_duplicate_cues_are_rejected(second):
+    with pytest.raises(ValidationError):
+        SnippetRegionPlan(idea="invalid", regions=[timed_region(1, 0, 1), timed_region(*second)])
+
+
+def test_explicit_cue_outside_scene_is_rejected():
+    plan = SnippetRegionPlan(idea="too long", regions=[timed_region(1, 1, 3)])
+    with pytest.raises(ValueError, match="beyond scene duration 2s"):
+        build_narration_weighted_plan(plan, 2)

@@ -80,6 +80,26 @@ def _detect_plan(image: Path, narration: str, model: str | None) -> SnippetRegio
     ))
 
 
+def _parse_size(value: str) -> tuple[int, int]:
+    try:
+        width, height = (int(part) for part in value.lower().split("x"))
+        if width <= 0 or height <= 0 or width % 2 or height % 2:
+            raise ValueError
+    except ValueError:
+        raise argparse.ArgumentTypeError("--size requires WIDTHxHEIGHT with positive even dimensions")
+    return width, height
+
+
+def _parse_fps(value: str) -> int:
+    try:
+        fps = int(value)
+        if fps <= 0:
+            raise ValueError
+    except ValueError:
+        raise argparse.ArgumentTypeError("--fps must be a positive integer")
+    return fps
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="whiteboard-animate",
@@ -92,6 +112,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--duration", type=float, default=8.0,
                         help="seconds per scene when there is no audio (default 8)")
     parser.add_argument("--quality", choices=["low", "medium", "high"], default="medium")
+    parser.add_argument("--size", type=_parse_size, default=None, metavar="WIDTHxHEIGHT",
+                        help="native output canvas, fit on white without stretching (e.g. 1080x1920)")
+    parser.add_argument("--fps", type=_parse_fps, default=None,
+                        help="override the quality preset's frame rate")
     parser.add_argument("--regions", nargs="*", default=[],
                         help="one region plan JSON per image, in the same order")
     parser.add_argument("--detect-regions", action="store_true",
@@ -134,7 +158,9 @@ def _run(args: argparse.Namespace) -> int:
             region_plan=plan,
         ))
 
-    durations = render_video(scenes, args.output, quality=args.quality)
+    durations = render_video(
+        scenes, args.output, quality=args.quality, output_size=args.size, fps=args.fps,
+    )
     print(f"wrote {args.output} ({sum(durations):.1f}s, {len(durations)} scene(s))", file=sys.stderr)
     return 0
 

@@ -72,3 +72,29 @@ def test_output_cannot_overwrite_audio(image_path, tmp_path, capsys):
     assert run_cli(image_path, tmp_path, "--audio", str(audio)) == 1
     assert "different from every input" in capsys.readouterr().err
     assert audio.read_bytes() == b"keep this input"
+
+
+@pytest.mark.parametrize("option,value", [
+    ("--size", "1080"), ("--size", "0x1920"), ("--size", "1081x1920"),
+    ("--size", "1080x1920x30"), ("--size", "1080xnan"),
+    ("--fps", "0"), ("--fps", "-1"), ("--fps", "nan"), ("--fps", "29.5"),
+])
+def test_invalid_output_options_fail_before_render(image_path, tmp_path, option, value):
+    with pytest.raises(SystemExit) as error:
+        run_cli(image_path, tmp_path, option, value)
+    assert error.value.code == 2
+    assert not (tmp_path / "out.mp4").exists()
+
+
+def test_output_options_are_passed_to_renderer(image_path, tmp_path, monkeypatch):
+    captured = {}
+    monkeypatch.setattr(cli.shutil, "which", lambda name: f"/bin/{name}")
+
+    def render(scenes, output, **kwargs):
+        captured.update(kwargs)
+        return [scenes[0].duration]
+
+    monkeypatch.setattr(cli, "render_video", render)
+    assert run_cli(image_path, tmp_path, "--size", "1080x1920", "--fps", "30") == 0
+    assert captured["output_size"] == (1080, 1920)
+    assert captured["fps"] == 30

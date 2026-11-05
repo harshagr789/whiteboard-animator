@@ -203,6 +203,37 @@ class WhiteboardAnimator:
         new_w, new_h = int(w * scale), int(h * scale)
         return cv2.resize(img_array, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
+    @staticmethod
+    def _fit_canvas(img_array, output_size, element_plan):
+        if (len(output_size) != 2 or any(
+                not isinstance(value, int) or isinstance(value, bool)
+                or value <= 0 or value % 2 for value in output_size)):
+            raise ValueError("output_size must contain two positive even integers")
+        width, height = output_size
+        h, w = img_array.shape[:2]
+        scale = min(width / w, height / h)
+        fitted_w = max(1, min(width, round(w * scale)))
+        fitted_h = max(1, min(height, round(h * scale)))
+        left, top = (width - fitted_w) // 2, (height - fitted_h) // 2
+        interpolation = cv2.INTER_AREA if scale < 1 else cv2.INTER_CUBIC
+        fitted = cv2.resize(img_array, (fitted_w, fitted_h), interpolation=interpolation)
+        canvas = np.full((height, width, 3), 255, dtype=np.uint8)
+        canvas[top:top + fitted_h, left:left + fitted_w] = fitted
+        if element_plan:
+            element_plan = [
+                {**entry, "boxes": [
+                    {
+                        "xmin": (left + box["xmin"] / 1000 * fitted_w) / width * 1000,
+                        "xmax": (left + box["xmax"] / 1000 * fitted_w) / width * 1000,
+                        "ymin": (top + box["ymin"] / 1000 * fitted_h) / height * 1000,
+                        "ymax": (top + box["ymax"] / 1000 * fitted_h) / height * 1000,
+                    }
+                    for box in entry.get("boxes") or []
+                ]}
+                for entry in element_plan
+            ]
+        return canvas, element_plan
+
     def _schedule_components(
             self, components: list, draw_duration: float, start: float = 0.0,
     ) -> list:
@@ -307,7 +338,9 @@ class WhiteboardAnimator:
             if not objects:
                 continue
             start = float(entry["start"])
-            end = max(float(entry["end"]), start + 0.05)
+            end = float(entry["end"])
+            if end <= start:
+                raise ValueError("drawing cue end must be greater than start")
             for obj, obj_start, obj_duration in self._schedule_semantic_objects(
                     objects, start, end
             ):
@@ -364,13 +397,15 @@ class WhiteboardAnimator:
             natural += min(max(child_count - 1, 0) * 0.07, 0.35)
             durations.append(float(np.clip(natural, 0.3, 1.6)))
 
-        window = max(end - start, 0.05)
+        window = end - start
+        if window <= 0:
+            raise ValueError("drawing cue end must be greater than start")
         gap = 0.12 if len(objects) > 1 else 0.0
         required = sum(durations) + gap * (len(objects) - 1)
         if required > window:
             available = max(window - gap * (len(objects) - 1), window * 0.8)
             scale = available / max(sum(durations), 1e-6)
-            durations = [max(duration * scale, 0.08) for duration in durations]
+            durations = [duration * scale for duration in durations]
             gap = max((window - sum(durations)) / max(len(objects) - 1, 1), 0.0)
 
         schedule = []
@@ -405,10 +440,16 @@ class WhiteboardAnimator:
             bitrate: str = "1500k",
             preset: str = "veryfast",
             element_plan: list | None = None,
+            output_size: tuple[int, int] | None = None,
     ):
+        if not isinstance(fps, int) or isinstance(fps, bool) or fps <= 0:
+            raise ValueError("fps must be a positive integer")
         t0 = time.monotonic()
         img_array = self._enforce_white_bg(img_array)
-        img_array = self._downscale(img_array)
+        if output_size is None:
+            img_array = self._downscale(img_array)
+        else:
+            img_array, element_plan = self._fit_canvas(img_array, output_size, element_plan)
         components = self._find_components(img_array)
         t1 = time.monotonic()
         logger.info("component detection: %.2fs", t1 - t0)
